@@ -1,0 +1,119 @@
+Syntax
+
+*import drug use dataset*
+ import sasxport "C:\Users\guangze\Downloads\DUQ_I.XPT" sort seqn
+save
+
+*import medical condition*
+ import sasxport "C:\Users\guangze\Downloads\MCQ_I.XPT" sort seqn
+save
+
+*import income data*
+import sasxport "C:s\INQ_I.XPT" sort seqn
+save
+
+*import smoking data*
+import sasxport "C:\\SMQ_I.XPT" sort seqn
+save
+
+*import physical activity data*
+ import sasxport "C:\s\PAQ_I.XPT"
+save
+
+*import demographic data*
+import sasxport "C:\\DEMO_I.XPT" sort seqn
+save
+
+*import dietary data*
+import sasxport "C:\\DSQTOTI.XPT" sort seqn
+save
+
+*import chest pain data*
+import sasxport "C:\\CDQ_I.XPT" sort seqn
+save
+
+*Merge datasets*
+use "demographics.dta"
+merge 1:1 seqn using "activity.dta"
+drop _merge
+*repeat for all datasets, activity, medical conditions, supplements, chest pain, smoking, and income datasets*
+
+*save dataset*
+save project.dta, replace
+
+*Data cleaning*
+keep sdmvstra sdmvpsu wtint2yr seqn ridageyr ridreth3 cd001  dsdancnt dsdcount indhhin2 dsqtvk dsqtvd dsqtmagn dsqtcalc inq020 smq040 smq925 paq722 duq250 mcq160c mcq160e
+
+*Survey weights*
+svyset [pweight = wtmec2yr], strata(sdmvstra) psu(sdmvpsu) singleunit(centered)
+
+*create subpopulation of only those who have chest pain data"
+drop if cdq001 ==.
+
+*generate binary variable for consumption of dietary supplements based off those who were recorded as self reported vitamin taker and those who were not included*
+generate vitk=.
+replace vitk=1 if dsqtvk >0
+replace vitk=0 if dsqtvk=.
+label define vitk2 0"no Vitamin K intake" 1"Vitamin K intake"
+label value vitk vitk2
+
+generate vitd=.
+replace vitd=1 if dsqtvd >0
+replace vitd=0 if dsqtvd==.
+label define vitd2 0"no Vitamin D intake" 1"Vitamin D intake"
+label value vitd vitd2
+
+generate vitcalc=.
+replace vitcalc=1 if dsqtcalc >0
+replace vitcalc=0 if dsqtcalc==.
+label define vitcalc2 0"no Calcium intake" 1"Calcium intake"
+label value vitcalc vitcalc2
+
+generate vitmag=.
+replace vitmag=1 if dsqtmagn >0
+replace vitmag=0 if dsqtmagn==.
+label define vitmag2 0"no Magnesium intake" 1"Magnesium intake"
+label value vitmag vitmag2
+
+*recoding variables*
+label define eth1 1 "Mexican American" 2 "Other Hispanic" 3 "Non-Hispanic White" 4 "Non-Hispanic Black" 6 "Non-Hispanic Asian" 7 "Other Race - Including Multi-Racial"	
+label values ridreth3 eth1
+
+gen age=.
+replace age=1 if ridageyr <50
+replace age=2 if ridageyr >= 50 & ridageyr <60
+replace age=3 if ridageyr >60
+label define age1 1"less than 50 yrs" 2"50-60 yrs" 3"more than 60yrs"
+
+*check VIF*
+regress cdq001 age ridreth3 inc smq040 smq925 duq250 mcq160c mcq160e sed vitk vitd vitcalc vitmag
+
+*unadjusted logistic regression*
+svyset [pweight = wtmec2yr], strata(sdmvstra) psu(sdmvpsu) singleunit(centered)
+svy:logistic cdq001 vitk
+svy:logistic cdq001 vitd
+svy:logistic cdq001 vitcalc
+svy:logistic cdq001 vitmag
+
+*test for predictability*
+testparm ib3.age
+testparm ib3.ridreth3
+testparm i.inc
+testparm ib3.smq040
+testparm i.duq250
+testparm ib2.mcq160c
+testparm 1b2.mcq160e
+testparm i.sed
+testparm 1.vitk
+testparm 1.vitd
+testparm 1.vitcalc
+testparm 1.vitmag
+
+
+*adjusted multiple logistic regression*
+svyset [pweight = wtmec2yr], strata(sdmvstra) psu(sdmvpsu) singleunit(centered)
+svy: logistic cdq001 ib3.age ib3.ridreth3 i.inc ib3.smq040 i.duq250 ib2.mcq160c ib2.mcq160e i.sed i.vitk i.vitd i.vitcalc i.vitmag
+
+
+svy: logistic cdq001 age ridreth3 inc smq040 duq250 mcq160c mcq160e sed vitk vitd vitcalc vitmag
+
